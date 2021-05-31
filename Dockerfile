@@ -9,6 +9,8 @@ RUN apt-get update && \
     libglu1-mesa \
   && rm -rf /var/lib/apt/lists/*
 
+RUN apt-get install android-sdk
+
 # RUN locale-gen en_US.UTF-8
 ENV LANG en_US.UTF-8
 
@@ -25,6 +27,10 @@ RUN curl -L https://dl.google.com/android/repository/commandlinetools-linux-${SD
   mkdir -p ${ANDROID_HOME} && \
   unzip /tmp/tools.zip -d ${ANDROID_HOME} && \
   rm -v /tmp/tools.zip
+  
+ENV BUILD_TOOLS "30.0.2"
+ENV TARGET_SDK "30"
+ENV PATH $PATH:${ANDROID_HOME}/build-tools/${BUILD_TOOLS}
 
 # Install SDK Packages
 RUN mkdir -p /root/.android/ && touch /root/.android/repositories.cfg && \
