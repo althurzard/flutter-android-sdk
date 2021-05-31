@@ -21,7 +21,7 @@ ENV TARGET_SDK "30"
 ENV ANDROID_HOME "/opt/sdk"
 
 # Download and extract Android Tools
-RUN curl -L http://dl.google.com/android/repository/sdk-tools-linux-${SDK_TOOLS}.zip -o /tmp/tools.zip --progress-bar && \
+RUN curl -L https://dl.google.com/android/repository/commandlinetools-linux-${SDK_TOOLS}_latest.zip -o /tmp/tools.zip --progress-bar && \
   mkdir -p ${ANDROID_HOME} && \
   unzip /tmp/tools.zip -d ${ANDROID_HOME} && \
   rm -v /tmp/tools.zip
