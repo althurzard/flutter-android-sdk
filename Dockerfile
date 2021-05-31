@@ -1,50 +1,65 @@
+FROM ubuntu:20.04
 
-FROM openjdk:11
+ENV UID=1000
+ENV GID=1000
+ENV USER="developer"
+ENV JAVA_VERSION="8"
+ENV ANDROID_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-6858069_latest.zip"
+ENV ANDROID_VERSION="29"
+ENV ANDROID_BUILD_TOOLS_VERSION="29.0.3"
+ENV ANDROID_ARCHITECTURE="x86_64"
+ENV ANDROID_SDK_ROOT="/home/$USER/android"
+ENV FLUTTER_CHANNEL="stable"
+ENV FLUTTER_VERSION="2.2.1"
+ENV FLUTTER_URL="https://storage.googleapis.com/flutter_infra/releases/$FLUTTER_CHANNEL/linux/flutter_linux_$FLUTTER_VERSION-$FLUTTER_CHANNEL.tar.xz"
+ENV FLUTTER_HOME="/home/$USER/flutter"
+ENV FLUTTER_WEB_PORT="8090"
+ENV FLUTTER_DEBUG_PORT="42000"
+ENV FLUTTER_EMULATOR_NAME="flutter_emulator"
+ENV PATH="$ANDROID_SDK_ROOT/cmdline-tools/tools/bin:$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/platform-tools:$ANDROID_SDK_ROOT/platforms:$FLUTTER_HOME/bin:$PATH"
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    curl \
-    git \
-    lib32stdc++6 \
-    libglu1-mesa \
-  && rm -rf /var/lib/apt/lists/*
+# install all dependencies
+ENV DEBIAN_FRONTEND="noninteractive"
+RUN apt-get update \
+  && apt-get install --yes --no-install-recommends openjdk-$JAVA_VERSION-jdk curl unzip sed git bash xz-utils libglvnd0 ssh xauth x11-xserver-utils libpulse0 libxcomposite1 libgl1-mesa-glx \
+  && rm -rf /var/lib/{apt,dpkg,cache,log}
 
-RUN apt-get install android-sdk
+# create user
+RUN groupadd --gid $GID $USER \
+  && useradd -s /bin/bash --uid $UID --gid $GID -m $USER
 
-# RUN locale-gen en_US.UTF-8
-ENV LANG en_US.UTF-8
+USER $USER
+WORKDIR /home/$USER
 
-# Installing android base on what found at
-# https://hub.docker.com/r/alvrme/alpine-android/~/dockerfile/
+# android sdk
+RUN mkdir -p $ANDROID_SDK_ROOT \
+  && mkdir -p /home/$USER/.android \
+  && touch /home/$USER/.android/repositories.cfg \
+  && curl -o android_tools.zip $ANDROID_TOOLS_URL \
+  && unzip -qq -d "$ANDROID_SDK_ROOT" android_tools.zip \
+  && rm android_tools.zip \
+  && mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/tools \
+  && mv $ANDROID_SDK_ROOT/cmdline-tools/bin $ANDROID_SDK_ROOT/cmdline-tools/tools \
+  && mv $ANDROID_SDK_ROOT/cmdline-tools/lib $ANDROID_SDK_ROOT/cmdline-tools/tools \
+  && yes "y" | sdkmanager "build-tools;$ANDROID_BUILD_TOOLS_VERSION" \
+  && yes "y" | sdkmanager "platforms;android-$ANDROID_VERSION" \
+  && yes "y" | sdkmanager "platform-tools" \
+  && yes "y" | sdkmanager "emulator" \
+  && yes "y" | sdkmanager "system-images;android-$ANDROID_VERSION;google_apis_playstore;$ANDROID_ARCHITECTURE"
 
-ENV SDK_TOOLS "7302050"
-ENV BUILD_TOOLS "30.0.3"
-ENV TARGET_SDK "30"
-ENV ANDROID_HOME "/opt/sdk"
+# flutter
+RUN curl -o flutter.tar.xz $FLUTTER_URL \
+  && mkdir -p $FLUTTER_HOME \
+  && tar xf flutter.tar.xz -C /home/$USER \
+  && rm flutter.tar.xz \
+  && flutter config --no-analytics \
+  && flutter precache \
+  && yes "y" | flutter doctor --android-licenses \
+  && flutter doctor \
+  && flutter emulators --create \
+  && flutter update-packages
 
-# Download and extract Android Tools
-RUN curl -L https://dl.google.com/android/repository/commandlinetools-linux-${SDK_TOOLS}_latest.zip -o /tmp/tools.zip --progress-bar && \
-  mkdir -p ${ANDROID_HOME} && \
-  unzip /tmp/tools.zip -d ${ANDROID_HOME} && \
-  rm -v /tmp/tools.zip
-  
-ENV BUILD_TOOLS "30.0.2"
-ENV TARGET_SDK "30"
-ENV PATH $PATH:${ANDROID_HOME}/build-tools/${BUILD_TOOLS}
-
-# Install SDK Packages
-RUN mkdir -p /root/.android/ && touch /root/.android/repositories.cfg && \
-  yes | ${ANDROID_HOME}/tools/bin/sdkmanager "--licenses" && \
-  ${ANDROID_HOME}/tools/bin/sdkmanager "--update" && \
-  ${ANDROID_HOME}/tools/bin/sdkmanager "build-tools;${BUILD_TOOLS}" "platform-tools" "platforms;android-${TARGET_SDK}" "extras;android;m2repository" "extras;google;google_play_services" "extras;google;m2repository"
-
-# Install flutter
-ENV FLUTTER_HOME "/opt/flutter"
-ENV FLUTTER_VERSION "0.2.8-beta"
-RUN mkdir -p ${FLUTTER_HOME} && \
-  curl -L https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz -o /tmp/flutter.tar.xz --progress-bar && \
-  tar xf /tmp/flutter.tar.xz -C /tmp && \
-  mv /tmp/flutter/ -T ${FLUTTER_HOME} && \
-  rm -rf /tmp/flutter.tar.xz
-
-ENV PATH=$PATH:$FLUTTER_HOME/bin
+COPY entrypoint.sh /usr/local/bin/
+COPY chown.sh /usr/local/bin/
+COPY flutter-android-emulator.sh /usr/local/bin/flutter-android-emulator
+ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
