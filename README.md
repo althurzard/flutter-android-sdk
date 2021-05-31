@@ -1,6 +1,6 @@
 # Docker image with Android SDK and Flutter
 
-Based on [`openjdk:8-slim`](https://hub.docker.com/_/openjdk/) and the work of
+Based on [`openjdk:11`](https://hub.docker.com/_/openjdk/) and the work of
 [Álvaro S.](https://github.com/alvr/alpine-android) on installing the android
 sdk.
 
@@ -18,7 +18,7 @@ Here is an example `bitbucket-pipelines.yml` for Bitbucket Pipelines including
 caches for gradle and gradlewrapper:
 
 ```
-image: valotas/lokali-build:version-1
+image: althurzard/flutter-android-sdk
 
 pipelines:
   default:
